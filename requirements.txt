@@ -1,0 +1,9 @@
+# Install the carla client that MATCHES your CARLA server version, e.g.
+#   pip install carla==0.9.15
+# (or use the .whl / .egg shipped in CarlaUE4/PythonAPI/carla/dist)
+numpy>=1.21
+opencv-python>=4.5
+pyyaml>=5.4
+matplotlib>=3.4        # scripts/plot_run.py
+pygame>=2.1            # optional: scripts/manual_drive.py --keyboard
+pytest>=7              # optional: tests (python -m unittest also works)
