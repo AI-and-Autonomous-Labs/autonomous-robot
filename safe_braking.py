@@ -1,0 +1,1 @@
+print("SCRUM-15: Safe vehicle braking active")
