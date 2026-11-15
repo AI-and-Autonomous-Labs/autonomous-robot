@@ -1,0 +1,1 @@
+print("SCRUM-14: Obstacle detection active")
