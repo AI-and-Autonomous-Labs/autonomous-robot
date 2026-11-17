@@ -1,0 +1,152 @@
+# LaneBot default configuration. Every tunable number lives here.
+# Override any value from the command line, e.g.
+#   python scripts/run.py --set control.lateral.kp=0.35 --set carla.map=Town05
+
+carla:
+  host: localhost
+  port: 2000
+  timeout_s: 20.0
+  map: Town04                 # highway loop: long straights, gentle + sharper curves, clear lane markings
+  reload_map: false           # true = always reload (resets the world)
+  fixed_delta_s: 0.05         # 20 Hz synchronous simulation
+  no_rendering: false
+  weather: ClearNoon          # any carla.WeatherParameters preset name
+  seed: 42
+
+vehicle:
+  blueprint: vehicle.tesla.model3
+  role_name: hero
+  spawn:
+    index: auto               # integer spawn-point index, or "auto" = pick a long road with a left lane
+    min_clear_road_m: 250     # auto: free road ahead without junctions
+    require_left_lane: true   # auto: needs a same-direction left lane (for avoidance)
+  spectator_follow: true
+
+sensors:
+  camera:
+    enabled: true
+    image_w: 800
+    image_h: 600
+    fov_deg: 90
+    x: 1.0                    # mount position in vehicle frame [m]
+    y: 0.0
+    z: 1.6
+    pitch_deg: -12.0          # negative = looking down
+  lidar:
+    enabled: true
+    x: front_bumper           # number [m] or "front_bumper"
+    y: 0.0
+    z: 0.9
+    range_m: 60.0
+    channels: 32
+    points_per_second: 300000
+    upper_fov_deg: 8.0
+    lower_fov_deg: -16.0
+  collision: true
+  lane_invasion: true
+
+lane_detection:
+  source: vision              # vision | map   (map = CARLA ground truth, useful for debugging)
+  bev:                        # bird's-eye-view window on the ground, relative to the camera
+    x_near_m: 5.0
+    x_far_m: 30.0
+    half_width_m: 6.0
+    px_per_m_lateral: 20
+    px_per_m_forward: 10
+  threshold:
+    l_min: 170                # HLS lightness for white paint (0-255)
+    l_percentile: 97          # adaptive: threshold = max(l_min, this percentile of L)
+    yellow_h: [12, 40]        # HLS hue range of yellow paint
+    yellow_s_min: 90
+    sobel_min: 40             # horizontal gradient magnitude (0-255 scaled)
+  windows: 12
+  window_margin_m: 0.5
+  min_pixels_window: 12
+  min_points_line: 60
+  min_span_m: 8.0
+  default_lane_width_m: 3.5
+  width_range_m: [2.6, 4.8]
+  smoothing_alpha: 0.5        # 1 = no smoothing
+  hold_frames: 6              # keep last estimate this many frames when detection drops out
+
+obstacle_detection:
+  corridor_half_width_m: 1.3  # vehicle half width + margin around the lane-centre path
+  min_height_m: 0.25          # above the fitted ground
+  max_height_m: 2.8
+  min_range_m: 0.5
+  max_range_m: 55.0
+  cluster_length_m: 1.5
+  min_points: 6
+  debounce_on: 2              # detections in the last `window` frames needed to report an obstacle
+  debounce_off: 6             # empty frames needed to clear it again
+  window: 4
+
+control:
+  lateral:
+    kp: 0.22
+    ki: 0.01
+    kd: 0.06
+    i_limit: 0.3
+    lookahead_min_m: 3.0
+    lookahead_time_s: 0.6
+    feedforward_gain: 1.0
+    wheelbase_m: 2.9
+    max_steer: 0.7            # |steer| limit at low speed
+    max_steer_high_speed: 0.3 # |steer| limit at high_speed_mps
+    high_speed_mps: 20.0
+    max_steer_rate_per_s: 2.0
+  longitudinal:
+    kp: 0.35
+    ki: 0.05
+    kd: 0.0
+    i_limit: 0.5
+    brake_gain: 1.2
+    brake_deadband: 0.05
+    hold_brake: 0.6           # brake applied while stopped
+    max_accel_mps2: 1.5       # rate limit on the target speed going up
+  speed:
+    cruise_kmh: 30
+    max_lateral_accel_mps2: 2.0   # curve speed limit: v = sqrt(a_lat / |curvature|)
+    min_curve_speed_kmh: 10
+
+safety:
+  reaction_time_s: 0.3        # sensing + compute delay
+  comfort_decel_mps2: 3.0     # normal braking
+  max_decel_mps2: 6.5         # emergency braking
+  stop_margin_m: 3.0          # desired gap to the obstacle when stopped
+  min_gap_m: 1.0              # emergency-brake gap
+  stopped_speed_mps: 0.15
+  clear_time_s: 1.0           # obstacle gone this long -> stop braking
+  resume_time_s: 2.0          # stopped and path clear this long -> drive on
+  lane_lost_time_s: 1.0       # no lane this long -> SAFE_STOP
+  lane_recover_time_s: 0.5
+
+avoidance:                    # stretch goal (SCRUM-16/37)
+  enabled: false
+  wait_before_s: 2.0          # wait stopped this long before deciding to pass
+  stop_gap_m: 12.0            # with avoidance on, stop this far back (room to steer out)
+  ramp_length_m: 18.0         # distance to move over / back
+  pass_buffer_m: 8.0          # extra distance after the obstacle before moving back
+  obstacle_length_m: 5.0      # assumed length if unknown
+  speed_kmh: 15
+
+obstacles:                    # spawned at start (SCRUM-25). distance is along the ego lane from the spawn point
+  - blueprint: vehicle.audi.a2     # parked car
+    distance_m: 70
+    lateral_offset_m: 0.0
+    lane: ego                      # ego | left | right
+    yaw_offset_deg: 0
+
+logging:
+  enabled: true
+  dir: runs
+  every_n_ticks: 1
+
+display:
+  enabled: true               # OpenCV debug window (camera + lane overlay + BEV)
+  scale: 0.8
+
+run:
+  max_time_s: 120
+  stop_after_lap: false       # end the run after one lap (lap = back near the start after min_lap_m)
+  min_lap_m: 300
