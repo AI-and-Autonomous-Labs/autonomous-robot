@@ -1,0 +1,99 @@
+# Test scenarios (SCRUM-41), run by scripts/run_scenarios.py (SCRUM-42).
+# Each scenario = config overrides + pass criteria. The overrides are merged
+# over config/default.yaml (a list such as `obstacles` is replaced, not merged).
+#
+# Criteria keys (all optional):
+#   no_collision: true            no collision events
+#   max_lane_error_m: 0.5         max |true lateral offset| while following the lane
+#   max_lane_invasions: 0         lane-marking crossings
+#   final_state: STOPPED          state at the end of the run
+#   stop_gap_range_m: [1, 6]      true bumper gap when the car came to a stop
+#   must_not_stop: true           never enters STOPPED (false-positive check)
+#   must_visit_state: AVOIDING    state that must occur at least once
+#   lap_completed: true
+#   min_distance_m: 300
+
+scenarios:
+  - name: S01_lane_keep_straight
+    description: Lane keeping without obstacles, 60 s at 30 km/h.
+    max_time_s: 60
+    overrides:
+      obstacles: []
+    criteria: {no_collision: true, max_lane_error_m: 0.5, max_lane_invasions: 0, min_distance_m: 300}
+
+  - name: S02_full_lap
+    description: One full lap of the Town04 highway loop (straights + curves).
+    max_time_s: 900
+    stop_after_lap: true
+    overrides:
+      obstacles: []
+    criteria: {no_collision: true, max_lane_error_m: 0.6, max_lane_invasions: 0, lap_completed: true}
+
+  - name: S03_stop_car_30kmh
+    description: Parked car in the ego lane 70 m ahead, cruise 30 km/h.
+    max_time_s: 40
+    overrides:
+      control: {speed: {cruise_kmh: 30}}
+      obstacles: [{blueprint: vehicle.audi.a2, distance_m: 70, lane: ego}]
+    criteria: {no_collision: true, final_state: STOPPED, stop_gap_range_m: [1.0, 6.0]}
+
+  - name: S04_stop_car_40kmh
+    description: Parked car 100 m ahead, cruise 40 km/h (longer stopping distance).
+    max_time_s: 45
+    overrides:
+      control: {speed: {cruise_kmh: 40}}
+      obstacles: [{blueprint: vehicle.audi.a2, distance_m: 100, lane: ego}]
+    criteria: {no_collision: true, final_state: STOPPED, stop_gap_range_m: [1.0, 6.0]}
+
+  - name: S05_stop_small_obstacle
+    description: Traffic cone 50 m ahead at 20 km/h (small, low object).
+    max_time_s: 40
+    overrides:
+      control: {speed: {cruise_kmh: 20}}
+      obstacles: [{blueprint: static.prop.trafficcone01, distance_m: 50, lane: ego}]
+    criteria: {no_collision: true, final_state: STOPPED, stop_gap_range_m: [1.0, 6.0]}
+
+  - name: S06_obstacle_offset_in_lane
+    description: Barrier 60 m ahead, 0.8 m right of the lane centre (still blocks the car).
+    max_time_s: 40
+    overrides:
+      obstacles: [{blueprint: static.prop.streetbarrier, distance_m: 60, lane: ego, lateral_offset_m: 0.8}]
+    criteria: {no_collision: true, final_state: STOPPED, stop_gap_range_m: [1.0, 6.0]}
+
+  - name: S07_obstacle_in_next_lane
+    description: Car parked in the LEFT lane - must be ignored (no stop).
+    max_time_s: 35
+    overrides:
+      obstacles: [{blueprint: vehicle.audi.a2, distance_m: 60, lane: left}]
+    criteria: {no_collision: true, must_not_stop: true, min_distance_m: 150}
+
+  - name: S08_obstacle_close_start
+    description: Obstacle only 25 m ahead of the start (short reaction distance).
+    max_time_s: 30
+    overrides:
+      obstacles: [{blueprint: vehicle.audi.a2, distance_m: 25, lane: ego}]
+    criteria: {no_collision: true, final_state: STOPPED, stop_gap_range_m: [0.8, 6.0]}
+
+  - name: S09_wet_weather_stop
+    description: Same as S03 in wet, cloudy weather (harder lane detection, reflections).
+    max_time_s: 45
+    overrides:
+      carla: {weather: WetCloudyNoon}
+      obstacles: [{blueprint: vehicle.audi.a2, distance_m: 70, lane: ego}]
+    criteria: {no_collision: true, final_state: STOPPED, stop_gap_range_m: [1.0, 6.0]}
+
+  - name: S10_baseline_map_lanes
+    description: S03 with ground-truth lanes from the map, to separate perception from control problems.
+    max_time_s: 40
+    overrides:
+      lane_detection: {source: map}
+      obstacles: [{blueprint: vehicle.audi.a2, distance_m: 70, lane: ego}]
+    criteria: {no_collision: true, final_state: STOPPED, stop_gap_range_m: [1.0, 6.0], max_lane_error_m: 0.3}
+
+  - name: S11_avoid_obstacle
+    description: (stretch) Stop, then pass the parked car in the left lane and return.
+    max_time_s: 70
+    overrides:
+      avoidance: {enabled: true}
+      obstacles: [{blueprint: vehicle.audi.a2, distance_m: 70, lane: ego}]
+    criteria: {no_collision: true, must_visit_state: AVOIDING, final_state: FOLLOW_LANE, min_distance_m: 150}
